@@ -55,6 +55,11 @@ test {
 * 롬복 플러그인 설치
 
 
-
 * `Annotation Processors`에서 `Enable annotaion processing` 항목 체크
   ![](https://i.ibb.co/BHJ4CyP/bandicam-2021-06-02-18-13-09-187.jpg)
+
+# Note
+
+* IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
+    * 이땐 build를 gradle로 다시 설정하거나
+    * `provideRuntime 'org.springframework.boot:spring-boot-starter-tomcat`을 제거해야 한다.
