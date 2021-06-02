@@ -274,6 +274,169 @@ username-kim&age=20
 > **중요!!**<br>
 > `HTTPServletRequest`, `HttpServletResponse`를 사용할 때 가장 중요한 점은 이 객체들이 HTTP 요청 메시지, HTTP 응답 메시지를 편리하게 사용하도록 도와주는 객체라는 점이다. 따라서 이 기능에 대해서 깊이있는 이해를 하려면 **HTTP 스펙이 제공하는 요청, 응답 메시지 자체를 이해**해야 한다.
 
+### 2-4. HTTPServletRequest - 기본 사용법
+
+이 장에서는 일차원적으로 `HTTPServletRequest`객체가 지원하는 메소드를 소개한다. 대부분 HTML 문서에서 원하는 정보를 get형식으로 뽑아오는 경우가 대부분이다. 따라서 부가적인 설명은 생략하고
+코드와 결과창만 기록한다.
+
+* hello.servlet.basic.request.RequestHeaderServlet
+  ```java
+  package hello.servlet.basic.request;
+  
+  import javax.servlet.ServletException;
+  import javax.servlet.annotation.WebServlet;
+  import javax.servlet.http.Cookie;
+  import javax.servlet.http.HttpServlet;
+  import javax.servlet.http.HttpServletRequest;
+  import javax.servlet.http.HttpServletResponse;
+  import java.io.IOException;
+  import java.util.Enumeration;
+  
+  @WebServlet(name = "requestHeaderServlet", urlPatterns = "/request-header")
+  public class RequestHeaderServlet extends HttpServlet {
+  
+      @Override
+      protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+          printStartLine(request);
+          printHeaders(request);
+          printHeaderUtils(request);
+          printEtc(request);
+      }
+  }
+  
+  ```
+
+#### start-line 정보
+
+```java
+public class RequestHeaderServlet extends HttpServlet {
+    private void printStartLine(HttpServletRequest request) {
+        System.out.println("--- REQUEST-LINE - start ---");
+        System.out.println("request.getMethod() = " + request.getMethod());
+        System.out.println("request.getProtocal() = " + request.getProtocol());
+        System.out.println("request.getScheme() = " + request.getScheme());
+        System.out.println("request.getRequestURL() = " + request.getRequestURL());
+        System.out.println("request.getRequestURI() = " + request.getRequestURI());
+        System.out.println("request.getQueryString() = " + request.getQueryString());
+        System.out.println("request.isSecure() = " + request.isSecure());
+        System.out.println("--- REQUEST-LINE - end ---");
+        System.out.println();
+    }
+}
+```
+
+* QueryParameter를 QueryString이라고 표현하기도 한다.
+
+* 결과  
+  ![](https://i.ibb.co/KGJbZ4v/bandicam-2021-06-02-22-30-53-806.jpg)
+
+#### 헤더 정보
+
+```java
+public class RequestHeaderServlet extens HttpServlet {
+    private void printHeaders(HttpServletRequest request) {
+        System.out.println("--- Headers - start ---");
+
+        // Enumeration<String> headerNames = request.getHeaderNames();
+        // while (headerNames.hasMoreElements()) {
+        //     String headerName = headerNames.nextElement();
+        //     System.out.println(headerName+": " + request.getHeader(headerName));
+        // }
+
+        request.getHeaderNames().asIterator()
+                .forEachRemaining(headerName -> System.out.println(headerName + ": " + request.getHeader(headerName)));
+
+        System.out.println("--- Headers - end ---");
+        System.out.println();
+    }
+}
+```
+
+* `request.getHeaderNames()`
+    * 옛날에 주로 이용했던 방식
+    * `JDK 1.5`부터 추가된 Enhanced for문인 `forEachRemaining`을 이용해서 간단하게 코드 작성이 가능하다.
+        * 자바에서는 Enhance for문을 이용할것을 권장하지만 일반적인 for loop가 속도는 더 빠르다.
+
+* 결과
+  ![](https://i.ibb.co/kJF56GD/bandicam-2021-06-02-22-36-27-353.jpg)
+
+#### Header 편리한 조회
+
+```java
+public class RequestHeaderServlet extends HttpServlet {
+    private void printHeaderUtils(HttpServletRequest request) {
+        System.out.println("--- Header 편의 조회 start ---");
+        System.out.println("[Host 편의 조회]");
+        System.out.println("request.getServerName() = " +
+                request.getServerName());
+        System.out.println("request.getServerPort() = " +
+                request.getServerPort());
+        System.out.println();
+        System.out.println("[Accept-Language 편의 조회]");
+        request.getLocales().asIterator()
+                .forEachRemaining(locale -> System.out.println("locale = " +
+                        locale));
+        System.out.println("request.getLocale() = " + request.getLocale());
+        System.out.println();
+        System.out.println("[cookie 편의 조회]");
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                System.out.println(cookie.getName() + ": " + cookie.getValue());
+            }
+        }
+        System.out.println();
+        System.out.println("[Content 편의 조회]");
+        System.out.println("request.getContentType() = " +
+                request.getContentType());
+        System.out.println("request.getContentLength() = " + request.getContentLength());
+        System.out.println("request.getCharacterEncoding() = " +
+                request.getCharacterEncoding());
+        System.out.println("--- Header 편의 조회 end ---");
+        System.out.println();
+    }
+}
+
+```
+
+* 결과  
+  ![](https://i.ibb.co/0n3mYGL/bandicam-2021-06-02-22-39-12-327.jpg)
+
+#### 기타 정보
+
+```java
+public class RequestHeaderServlet extends HttpServlet {
+    private void printEtc(HttpServletRequest request) {
+        System.out.println("--- 기타 조회 start ---");
+        System.out.println("[Remote 정보]");
+        System.out.println("request.getRemoteHost() = " +
+                request.getRemoteHost());
+        System.out.println("request.getRemoteAddr() = " +
+                request.getRemoteAddr());
+        System.out.println("request.getRemotePort() = " +
+                request.getRemotePort());
+        System.out.println();
+        System.out.println("[Local 정보]");
+        System.out.println("request.getLocalName() = " +
+                request.getLocalName());
+        System.out.println("request.getLocalAddr() = " +
+                request.getLocalAddr());
+        System.out.println("request.getLocalPort() = " +
+                request.getLocalPort());
+        System.out.println("--- 기타 조회 end ---");
+        System.out.println();
+    }
+}
+```
+
+* 결과  
+  ![](https://i.ibb.co/ScV0yby/bandicam-2021-06-02-22-41-28-359.jpg)
+
+> 참고  
+> 로컬에서 테스트하면 IPv6 정보가 나오는데, IPv4 정보를 보고 싶으면 다음 옵션을 VM options에 넣어주면 된다.
+> `-Djava.net.preferIPv4Stack=true`
+
+
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
