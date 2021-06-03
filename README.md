@@ -604,8 +604,94 @@ HTML의 Form을 사용해서 클라이언트에서 서버로 데이터 전송하
 * POST 전송시
     * Body -> `x-www-form-urlencoded`선택
     * Headers에서 content-type:`application/x-www-form-urlencoded`로 지정된 부분 꼭 확인!!
-  
 
+### 2-8. HTTP 요청 데이터 - API 메시지 바디 - 단순 텍스트
+
+* **HTTP message body**에 데이터를 직접 담아서 요청
+    * HTTP API에서 주로 사용, JSON, XML, TEXT
+    * 데이터 형식을 주로 JSON 사용
+    * POST, PUT PATCH
+
+* 먼저 가장 단순한 텍스트 메시지를 HTTP 메시지 바디에 담아서 전송하고 읽어보자.
+* HTTP 메시지 바디의 데이터를 `InputStream`을 사용해서 직접 읽을 수 있다.
+* 사실 자주 쓰이는 방식은 아니다. (단순 텍스트 보다는 JSON 형식을 많이 쓴다.)
+
+#### RequestBodyStringServlet
+
+```java
+package hello.servlet.basic.request;
+
+import org.springframework.util.StreamUtils;
+
+import javax.servlet.ServletException;
+import javax.servlet.ServletInputStream;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+@WebServlet(name = "requestBodyStringServlet", urlPatterns = "/request-body-string")
+public class RequestBodyStringServlet extends HttpServlet {
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        ServletInputStream inputStream = request.getInputStream();
+        String messageBody = StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
+
+        System.out.println("messageBody = " + messageBody);
+
+        response.getWriter().write("ok");
+    }
+}
+
+```
+
+* `StreamUtils`
+    * Spring에서 제공하는 util
+    * 스트림을 처리하기 위한 간단한 유틸리티 메서드이다.
+    * `copyToString`메소드를 이용해서 바이트 코드 형태의 `inputStream`을 String 형태로 변환하였다.
+
+    ```java
+    package hello.servlet;
+    
+    import org.hamcrest.MatcherAssert;
+    import org.junit.jupiter.api.Test;
+    import org.springframework.util.StreamUtils;
+    
+    import java.io.ByteArrayInputStream;
+    import java.io.InputStream;
+    import java.nio.charset.Charset;
+    
+    import static org.hamcrest.Matchers.equalTo;
+    import static org.mockito.Mockito.*;
+    
+    public class TestCode {
+        private String string = "abcdefg";
+    
+        @Test
+        public void copyToStringTest() throws Exception {
+            Charset charset = Charset.defaultCharset();
+            InputStream inputStream = spy(new ByteArrayInputStream(string.getBytes(charset)));
+            String actual = StreamUtils.copyToString(inputStream, charset);
+            System.out.println("actual = " + actual);
+            MatcherAssert.assertThat(actual, equalTo(string));
+            verify(inputStream, never()).close();
+        }
+    }
+    
+    ```
+    * 임의의 문자열을 바이트 문자열로 변환하고 그 문자열을 다시 String 형태로 변환하여 비교한 테스트 코드 (예제 코드)
+
+> 참고  
+> inputStream은 byte 코드를 반환한다. byte 코드를 우리가 읽을 수 있는 문자(String)로 보려면 문자표(Charset)를 지정해주어야 한다. 여기서는 UTF-8 Charset을 지정해 주었다.
+
+* 문자 전송
+    * POST http://localhost:8080/request-body-string
+    * content-type: text/plain
+    * message body: `hello`
+    * 결과: `messageBody = hello`
 
 # Note
 
