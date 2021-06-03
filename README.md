@@ -693,6 +693,115 @@ public class RequestBodyStringServlet extends HttpServlet {
     * message body: `hello`
     * 결과: `messageBody = hello`
 
+### 2-9. HTTP 요청 데이터 - API 메시지 바디 - JSON
+
+#### JSON 형식 전송
+
+* POST http://localhost:8080/request-body-json
+* content-type: application/json
+* message body: `{"username": "hello", "age": 20}`
+* 결과: `messageBody = {"username": "hello", "age": 20}`
+
+#### JSON 형식 파싱 추가
+
+##### HelloData
+
+* JSON 형식으로 파싱할 수 있게 객체를 하나 생성
+* `src/main/java/hello/servlet/basic/HelloData.java`
+
+```java
+package hello.servlet.basic;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class HelloData {
+
+    private String username;
+    private int age;
+}
+
+```
+
+#### RequestBodyJsonServlet
+
+*`src/main/java/hello/servlet/basic/request/RequestBodyJsonServlet.java`
+
+```java
+package hello.servlet.basic.request;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import hello.servlet.basic.HelloData;
+import org.springframework.util.StreamUtils;
+
+import javax.servlet.ServletException;
+import javax.servlet.ServletInputStream;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+/**
+ * http://localhost:8080/request-body-json
+ *
+ * JSON 형식 전송
+ * content-type: application/json
+ * message body: {"username": "hello", "age": "20"}
+ */
+
+@WebServlet(name = "requestBodyJsonServlet", urlPatterns = "/request-body-json")
+public class RequestBodyJsonServlet extends HttpServlet {
+
+    private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        ServletInputStream inputStream = request.getInputStream();
+        String messageBody = StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
+
+        System.out.println("messageBody = " + messageBody);
+
+        HelloData helloData = objectMapper.readValue(messageBody, HelloData.class);
+        System.out.println("helloData.username = " + helloData.getUsername());
+        System.out.println("helloData.age = " + helloData.getAge());
+
+        response.getWriter().write("ok");
+    }
+}
+
+```
+
+* `ObjectMapper`
+    * JSON 형식의 문서를 자바의 객체에 파싱하여 저장할 수 있도록 하는 클래스
+    * `Jackson` 라이브러리
+    * `readValue()`
+        * JSON의 키를 필드로 가지고 있는 객체에 매핑하여 JSON을 객체로 관리할 수 있도록 한다.
+        * 파싱을 할 클래스를 파라미터로 가지고 그 클래스를 반환값으로 가진다.
+        * `HelloData`클래스는 `username`과 `age`이름을 가진 변수를 필드에 가지고 있다.
+        * JSON의 키를 클래스의 필드의 변수명과 매핑하여 해당 변수명에 JSON의 value를 저장한다.
+
+#### Postman으로 실행
+
+* POST http://localhost:8080/request-body-json
+* content-type:**application/json**(Body->raw, 가장 오른쪽에서 JSON 선택)
+* message body: `{"username": "hello", "age":20}`
+* 출력 결과
+  ```
+  messageBody={"username": "hello", "age": 20}
+  data.username=hello
+  data.age=20
+  ```
+
+> 참고  
+> JSON 결과를 파싱해서 사용할 수 있는 자바 객체로 변환하려면 Jackson, Gson 같은 JSON 변환 라이브러리를 추가해서 사용해야 한다. 스프링 부트로 Spring MVC를 선택하면 기본으로 Jackson 라이브러리`(ObjectMapper)`를 함께 제공한다.
+
+> 참고  
+> HTML Form 데이터도 메시지 바디를 통해 전송되므로 직접 읽을 수 있다. 하지만 편리한 파라미터 조회기능(`request.getParameter(...)`)을 이미 제공하기 때문에 파라미터 조회 기능을 사용하면 된다.
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
