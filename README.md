@@ -75,6 +75,8 @@ test {
 `@ServletComponentScan`
 스프링 부터는 서블릿을 직접 등록해서 사용할 수 있도록 `@ServletComponentScan`을 지원한다.
 
+##### ServletApplication
+
 ```java
 package hello.servlet;
 
@@ -94,6 +96,8 @@ public class ServletApplication {
 ```
 
 #### 서블릿 등록하기
+
+##### HelloServlet
 
 ```java
 package hello.servlet.basic;
@@ -166,6 +170,7 @@ logging.level.org.apache.coyote.http11=debug
 * `webapp`경로에 `index.html`을 두면 http://localhost:8080 호출시 `index.html` 페이지가 열린다.
 * **html에 대한 내용은 생략하겠다.**
 
+#### index.html
 
 * `main/webapp/index.html`
     ```html
@@ -278,6 +283,8 @@ username-kim&age=20
 
 이 장에서는 일차원적으로 `HTTPServletRequest`객체가 지원하는 메소드를 소개한다. 대부분 HTML 문서에서 원하는 정보를 get형식으로 뽑아오는 경우가 대부분이다. 따라서 부가적인 설명은 생략하고
 코드와 결과창만 기록한다.
+
+#### RequestHeaderServlet
 
 * hello.servlet.basic.request.RequestHeaderServlet
   ```java
@@ -452,6 +459,91 @@ public class RequestHeaderServlet extends HttpServlet {
 
 * 데이터 형식은 주로 JSON 사용
     * POST, PUT, PATCH
+
+### 2-6. HTTP 요청 데이터 - GET 쿼리 파라미터
+
+* 전달 데이터
+    * username=hello
+    * age=20
+
+* 메시지 바디 없이, URL의 쿼리 파라미터를 사용해서 데이터를 전달한다.
+* 예) 검색, 필터, 페이징등에서 많이 사용하는 방식
+
+#### RequestParamServlet
+
+```java
+package hello.servlet.basic.request;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+/**
+ * 1. 파라미터 전송 기능
+ * http://localhost:8080/request-param?username=hello&age=20
+ */
+@WebServlet(name = "requestParamServlet", urlPatterns = "/request-param")
+public class RequestParamServlet extends HttpServlet {
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        System.out.println("[전체 파라미터 조회] - start");
+        request.getParameterNames().asIterator()
+                .forEachRemaining(paramName -> System.out.println(paramName + "=" + request.getParameter(paramName)));
+        System.out.println("[전체 파라미터 조회] - end");
+        System.out.println();
+        request.getParameterNames();
+
+        System.out.println("[단일 파라미터 조회]");
+        String username = request.getParameter("username");
+        String age = request.getParameter("age");
+
+        System.out.println("username = " + username);
+        System.out.println("age = " + age);
+        System.out.println();
+
+        System.out.println("[이름이 같은 복수 파라미터 조회]");
+        String[] usernames = request.getParameterValues("username");
+        for (String name : usernames) {
+            System.out.println("username = " + name);
+        }
+        System.out.println();
+
+        response.getWriter().write("ok");
+    }
+}
+
+```
+
+* 실행 - 파라미터 전송 (동일한 파라미터 전송 - username)
+    * http://localhost:8080/request-param?username=hello&age=20&username=kim
+    * 결과
+      ```
+      [전체 파라미터 조회] - start
+      username=hello
+      age=20
+      [전체 파라미터 조회] - end
+      
+      [단일 파라미터 조회]
+      request.getParameter(username) = hello
+      request.getParameter(age) = 20
+      
+      [이름이 같은 복수 파라미터 조회]
+      request.getParameterValues(username)
+      username=hello
+      username=kim
+      ```
+
+#### 복수 파라미터에서 단일 파라미터 조회
+
+`username=hello&username=kim`과 같이 파라미터 이름은 하나인데, 값이 중복이면 어떨게 될까?  
+`request.getParameter()`는 하나의 파라미터 이름에 대해서 단 하나의 값만 있을 때 사용해야 한다.   
+지금처럼 중복일 때는 `request.getParameterValues()`를 사용해야 한다.    
+참고로 이렇게 중복일 때 `request.getParameter()`를 사용하면 `request.getParameterValues()`의 첫 번째 값을 반환한다. (사실 파라미터 값을 중복되게 사용하는 경우는 거의
+없다.)
 
 # Note
 
