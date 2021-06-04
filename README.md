@@ -993,6 +993,182 @@ public class ResponseJsonServlet extends HttpServlet {
 > `application/json`은 스펙상 utf-8 형식을 사용하도록 정의되어 있다. 그래서 스펙에서 charset=utf-8과 같은 추가 파라미터를 지원하지 않는다. 따라서 `application/json`이라고만 사용해야지 `application/json;charset=utf-8`이라고 전달하는 것은 의미 없는 파라미터를 추가한 것이 된다.  
 > `response.getWriter()`를 사용하면 추가 파라미터를 자동으로 추가해버린다. 이때는 `response.getOutputStream()`으로 출력하면 그런 문제가 없다.
 
+## 3. 서블릿, JSP, MVC 패턴
+
+* 동일한 요구사상의 웹 어플리케이션을 서블릿 -> JSP -> MVC 패턴으로 개발하여 이전 단계의 단점을 보완한 다음단계를 직접 학습해 본다.
+
+#### 3-1. 회원 관리 웹 애플리케이션 요구사항
+
+* 회원 정보
+    * 이름: `username`
+    * 나이: `age`
+
+* 기능 요구사항
+    * 회원 저장
+    * 회원 목록 조회
+
+##### Member
+
+* 회원 도메인 모델
+* `src/main/java/hello/servlet/domain/member/Member`
+
+```java
+package hello.servlet.domain.member;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class Member {
+
+    private Long id;
+    private String username;
+    private int age;
+
+    public Member() {
+    }
+
+    public Member(String username, int age) {
+        this.username = username;
+        this.age = age;
+    }
+}
+
+```
+
+* `id`는 `Member`를 회원 저장소에 저장하면 회우너 저장소가 할당한다.
+
+##### MemberRepository
+
+* 회원 저장소
+* `src/main/java/hello/servlet/domain/member/MemberRepository`
+
+```java
+package hello.servlet.domain.member;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 동시성 문제가 고려되어 있지 않음, 실무에서는 ConcurrentHashMap, AtomicLong  사용 고려
+ */
+public class MemberRepository {
+
+    private static Map<Long, Member> store = new HashMap<>();
+    private static long sequence = 0L;
+
+    private static final MemberRepository instance = new MemberRepository();
+
+    public static MemberRepository getInstance() {
+        return instance;
+    }
+
+    private MemberRepository() {
+
+    }
+
+    public Member save(Member member) {
+        member.setId(++sequence);
+        store.put(member.getId(), member);
+        return member;
+    }
+
+    public Member findById(Long id) {
+        return store.get(id);
+    }
+
+    public List<Member> findAll() {
+        return new ArrayList<>(store.values());
+    }
+
+    public void clearStore() {
+        store.clear();
+    }
+}
+
+```
+
+* 스프링의 도움을 받지 않고 싱글톤 구현(스프링 없이 순수 서블릿으로 구현)
+    * `MemberRepository`의 필드에 존재하는 `store`, `sequence`는 애플리케이션이 구동하는 동안 단 한개만 존재해야 한다.
+    * `private static final MemberRepository instance = new MemberRepository()`
+        * 클래스는 자신을 생성하여 그 객체(`instance`)를 가지고 있다.
+    * `private MemberRepository()`
+        * 생성자를 private으로 막아 버려서 함부로 객체를 생성할 수 없다.
+    * `getInstance()`
+        * 클래스가 생성한 객체를 반환한다.
+        * 생성자 대신에 객체를 호출할 때 쓰이며, `getInstance()`로 호출된 모든 객체는 동일 객체로서 싱글톤 구현이 된다.
+
+* 싱글톤으로 구현했기 때문에 필드를 `static`으로 선언할 필요는 없다.
+
+##### MemberRepositoryTest
+
+* 회원 저장소 테스트
+* `src/test/java/hello/servlet/domain/member/MemberRepositoryTest`
+
+```java
+package hello.servlet.domain.member;
+
+import org.assertj.core.api.Assertions;
+import org.junit.After;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+class MemberRepositoryTest {
+
+    MemberRepository memberRepository = MemberRepository.getInstance();
+
+    @After
+    void afterEach() {
+        memberRepository.clearStore();
+    }
+
+    @Test
+    void save() {
+        // given
+        Member member = new Member("hello", 20);
+
+        // when
+        Member savedMember = memberRepository.save(member);
+
+        // then
+        Member findMember = memberRepository.findById(savedMember.getId());
+        assertThat(findMember).isEqualTo(savedMember);
+    }
+
+    @Test
+    void findAll() {
+        // given
+        Member member1 = new Member("member1", 20);
+        Member member2 = new Member("member2", 30);
+
+        memberRepository.save(member1);
+        memberRepository.save(member2);
+
+        // when
+        List<Member> result = memberRepository.findAll();
+
+        // then
+        assertThat(result.size()).isEqualTo(2);
+        assertThat(result).contains(member1, member2);
+    }
+
+}
+```
+
+* 회원을 저장하고, 목록을 조회하는 테스트 작성
+    * 각 테스트가 끝날 때, 다음 테스트에 영향을 주지 않도록 각 테스트의 저장소를 `clearStore()`를 호출해서 초기화했다.
+* `MemberRepository`는 싱글톤으로 구현했기 때문에 일반적인 생성자가 아닌 `getInstance`로 객체를 호출하여 사용한다.
+* `assertThat(result).conatains(member1, member2)`
+    * `result`에 `member1`, `member2`가 모두 포함되어 있는지를 알려준다.
+    * `contains()`의 파라미터는 `List`이기 때문에 파라미터의 갯수제한은 없다.
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
