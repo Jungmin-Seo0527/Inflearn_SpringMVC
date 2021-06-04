@@ -802,6 +802,97 @@ public class RequestBodyJsonServlet extends HttpServlet {
 > 참고  
 > HTML Form 데이터도 메시지 바디를 통해 전송되므로 직접 읽을 수 있다. 하지만 편리한 파라미터 조회기능(`request.getParameter(...)`)을 이미 제공하기 때문에 파라미터 조회 기능을 사용하면 된다.
 
+### 2-10. HttpServletResponse - 기본 사용법
+
+#### HttpServletResponse 역할
+
+* HTTP 응답 메시지 생성
+    * HTTP 응답코드 지정
+    * 헤더 생성
+    * 바디 생성
+
+* 편의 기능 제공
+    * Content-Type, 쿠키, Redirect
+
+#### ResponseHeaderServlet
+
+* `hello.servlet.response.ResponseHeaderServelt`
+
+```java
+package hello.servlet.basic.response;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+/**
+ * http://localhost:8080/response-header
+ */
+@WebServlet(name = "responseHeaderServlet", urlPatterns = "/response-header")
+public class ResponseHeaderServlet extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+        // [status-line]
+        response.setStatus(HttpServletResponse.SC_OK);
+
+        // [response-headers]
+        response.setHeader("Content-Type", "text/plain;charset=utf-8");
+        response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("my-header", "hello");
+
+        // [Header 편의 메서드]
+        content(response);
+        cookie(response);
+        redirect(response);
+
+        // [message body]
+        PrintWriter writer = response.getWriter();
+        writer.println("ok");
+    }
+
+    // Content 편의 메서드
+    private void content(HttpServletResponse response) {
+        // Content-Type: text/plain;charset=utf-8
+        // Content-Length: 2
+        // response.setHeader("Content-Type", "text/plain;charset=utf-8");
+        response.setContentType("text/plain");
+        response.setCharacterEncoding("utf-8");
+        // response.setContentLength(2); // (생략시 자동 생성)
+    }
+
+    // 쿠키 편의 메서드
+    private void cookie(HttpServletResponse response) {
+        // Set-Cookie: myCookie=good; Max-Age=600;
+        // response.setHeader("Set-Cookie", "myCookie=good; Max-Age=600");
+        Cookie cookie = new Cookie("myCookie", "good");
+        cookie.setMaxAge(600);
+        response.addCookie(cookie);
+    }
+
+    // redirect 편의 메서드
+    private void redirect(HttpServletResponse response) throws IOException {
+        // Status Code 302
+        // Location: /basic/hello-form.html
+
+        // response.setStatus(HttpServletResponse.SC_FOUND); // 302
+        // response.setHeader("Location", "/basic/hello-form.html");
+        response.sendRedirect("/basic/hello-form.html");
+    }
+}
+
+```
+
+* `set`으로 시작되는 메소드로 원하는 메시지 요소를 직접 작성하여 `HttpResponse`를 만들 수 있다.
+* 주석 처리 된 부분은 `setHeader`에서 원하는 키의 value값을 지정하는 형태이며, 주석처리가 되지 않는 부분은 `set`으로 시작하는 메소드 명으로 직접 값을 지정하는 방법이다.
+    * 주로 주석처리를 하지 않는 방법을 많이 사용한다. 결과적으로는 같은 결과를 보여준다.
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
