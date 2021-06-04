@@ -941,6 +941,58 @@ public class ResponseHtmlServlet extends HttpServlet {
 
 * `response.getWriter()`메소드를 이용해서 단순 텍스트를 HTML 형식으로 작성하여 message body를 작성했다.
 
+### 2-12. HTTP 응답 데이터 - API JSON
+
+#### ResponseJsonServlet
+
+* `hello.wervlet.web.response.ResponseJsonServlet`
+
+```java
+package hello.servlet.basic.response;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import hello.servlet.basic.HelloData;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@WebServlet(name = "responseJsonServlet", urlPatterns = "/response-json")
+public class ResponseJsonServlet extends HttpServlet {
+
+    private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // Content-Type: application/json
+        response.setContentType("application/json");
+        response.setCharacterEncoding("utf-8");
+
+        HelloData helloData = new HelloData();
+        helloData.setUsername("kim");
+        helloData.setAge(20);
+
+        // {"username": "kim", "age": 20}
+        String result = objectMapper.writeValueAsString(helloData);
+        System.out.println(result);
+        response.getWriter().write(result);
+    }
+}
+
+```
+
+* HTTP 응답으로 JSON을 반환할 때는 `content-Type`을 `application/json`으로 지정해야 한다.
+    * Jackson 라이브러라가 제공하는 `objectMapper.writeValueAsString()`를 사용하면 객체를 JSON 문자로 변경할 수 있다.
+    * 복습겸 언급하자면 JSON 파일 형식을 객체로 변환하는 메소드는 `readValue()`였다.
+    * 메소드 명은 객체의 입장에서 JSON을 읽어서 객체로 변환해야 한. `readValue()`, 객체를 JSON형태로 작성해야 하니 `writeValue()`임을 생각하자. (역시 자바는 객체 지향)
+
+> 참고  
+> `application/json`은 스펙상 utf-8 형식을 사용하도록 정의되어 있다. 그래서 스펙에서 charset=utf-8과 같은 추가 파라미터를 지원하지 않는다. 따라서 `application/json`이라고만 사용해야지 `application/json;charset=utf-8`이라고 전달하는 것은 의미 없는 파라미터를 추가한 것이 된다.  
+> `response.getWriter()`를 사용하면 추가 파라미터를 자동으로 추가해버린다. 이때는 `response.getOutputStream()`으로 출력하면 그런 문제가 없다.
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
