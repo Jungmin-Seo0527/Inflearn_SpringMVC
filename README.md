@@ -1169,6 +1169,340 @@ class MemberRepositoryTest {
     * `result`에 `member1`, `member2`가 모두 포함되어 있는지를 알려준다.
     * `contains()`의 파라미터는 `List`이기 때문에 파라미터의 갯수제한은 없다.
 
+### 3-2. 서블릿으로 회원 관리 웹 애플리케이션 만들기
+
+#### MemberFormServlet
+
+* 회원 등록 HTML 폼
+* `src/main/java/hello/servlet/web/servlet/MemberFormServlet.java`
+
+```java
+package hello.servlet.web.servlet;
+
+import hello.servlet.domain.member.MemberRepository;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+@WebServlet(name = "memberFormServlet", urlPatterns = "/servlet/members/new-form")
+public class MemberFormServlet extends HttpServlet {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        response.setContentType("text/html");
+        response.setCharacterEncoding("utf-8");
+
+        PrintWriter w = response.getWriter();
+        w.write("<!DOCTYPE html>\n" +
+                "<html>\n" +
+                "<head>\n" +
+                " <meta charset=\"UTF-8\">\n" + " <title>Title</title>\n" +
+                "</head>\n" +
+                "<body>\n" +
+                "<form action=\"/servlet/members/save\" method=\"post\">\n" +
+                " username: <input type=\"text\" name=\"username\" />\n" +
+                " age: <input type=\"text\" name=\"age\" />\n" +
+                " <button type=\"submit\">전송</button>\n" +
+                "</form>\n" +
+                "</body>\n" +
+                "</html>\n");
+    }
+}
+
+```
+
+* `response.getWriter()`와 `w.write()` 메소드를 이용해서 응답 메세지를 html 폼으로 작성
+    * 자바로 html 문서를 작성하는 노가다 작업이 필요하다.(문화 충격...)
+    * `username`과 `age`를 입력 받아서 `servlet/members/save`에 `POST`메소드의 html폼을 전송한다.
+    * 코드를 보면 `response`에 대한 content-Type, encoding방식을 `HTTPServletResponse`의 메소드로 선언을 했지만 html문서에서 다시 한번 인코딩 방식을 선언하는
+      중복이 발생 (spring MVC 단계에서는 이러한 과정이 전부 생략될것 같다.)
+
+* 여기까지의 단계에서는 HTML Form 데이터를 POST로 전송해도, 전달 받는 서블릿을 아직 만들지 않았다.(`/servlet/members/save`) 그래서 오류가 발생하는 것이 정상이다.
+
+* HTML tag 설명
+    * `<form action>`
+        * `<form>`태크의 `action`속성은 폼 데이터를 서버로 보낼 때 해당 데이터가 도착할 URL을 명시한다.
+    * `<input>`
+        * 입력 요소
+        * 사용자의 데이터를 받을 수 있는 대화형 컨트롤 생성
+    * `<button>`
+        * 클릭이 가능한 버튼
+    * 컨트롤러가 생성되는 것들은 css로 외형 변경이 가능하다.
+
+#### MemberSaveServlet
+
+* 회원 저장
+* HTML Form에서 데이터를 입력하고 전송을 누르면 실제 회원 데이터가 저장한다.
+* `src/main/java/hello/servlet/web/servlet/MemberSaveServlet.java`
+
+```java
+package hello.servlet.web.servlet;
+
+import hello.servlet.domain.member.Member;
+import hello.servlet.domain.member.MemberRepository;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+@WebServlet(name = "memberSaveServlet", urlPatterns = "/servlet/members/save")
+public class MemberSaveServlet extends HttpServlet {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        System.out.println("MemberSaveServlet.service");
+        String username = request.getParameter("username");
+        int age = Integer.parseInt(request.getParameter("age"));
+
+        Member member = new Member(username, age);
+        memberRepository.save(member);
+
+        response.setContentType("text/html");
+        response.setCharacterEncoding("utf-8");
+        PrintWriter w = response.getWriter();
+        w.write("<html>\n" +
+                "<head>\n" +
+                " <meta charset=\"UTF-8\">\n" +
+                "</head>\n" +
+                "<body>\n" +
+                "성공\n" +
+                "<ul>\n" +
+                " <li>id=" + member.getId() + "</li>\n" +
+                " <li>username=" + member.getUsername() + "</li>\n" +
+                " <li>age=" + member.getAge() + "</li>\n" +
+                "</ul>\n" +
+                "<a href=\"/index.html\">메인</a>\n" +
+                "</body>\n" +
+                "</html>");
+    }
+}
+```
+
+* 파라미터를 조회해서 Member 객체를 만든다.
+    * `request`에는 요청받은 `Member`에 대한 정보(`username`, `age`)가 들어있다.
+    * 즉 위에서 보낸 HTML Form 에서 입력한 `username`과 `age`가 이곳으로 전달된다.
+
+* `Member`객체를 `MemberRepository`를 통해서 저장한다.
+    * 이전에도 언급했지만, 단순 text, 파라미터 형식 모두 `getParameter()`메소드로 받을 수 있다.
+    * 단 모든 정보를 String으로 받기 때문에 올바른 자료형으로 변환하는 작업이 필요하다.
+
+* `Member`객체를 사용해서 결과 화면용 HTML을 동적으로 만들어서 응답한다.
+    * 자바로 HTML를 작성하기 때문에 중간중간 내가 원하는 값으로 출력하는 것이 가능하다.
+    * 하지만 노가다이다.
+
+* HTML tag
+    * `<ul>`
+        * Unordered List - 정돈되지 않은 리스트
+        * `<ul>`태그 안에 <li> 태그를 사용하여 각 항목을 표시한다.
+        * 각 항목 앞에 작은 원이나 사각형 같은 불릿(bullet)이 붙는다.(작은 원이 디폴트)
+    * `<a href>`
+        * html/css문서를 연결하는 a 태그
+        * 다른 웹 페이지로 이동도 가능하다.
+
+#### MemberListServlet
+
+* 회원 목록
+* 저장된 모든 회원 목록을 조회한다.
+* `src/main/java/hello/servlet/web/servlet/MemberListServlet.java`
+
+```java
+package hello.servlet.web.servlet;
+
+import hello.servlet.domain.member.Member;
+import hello.servlet.domain.member.MemberRepository;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.List;
+
+@WebServlet(name = "memberListServlet", urlPatterns = "/servlet/members")
+public class MemberListServlet extends HttpServlet {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        List<Member> members = memberRepository.findAll();
+
+        response.setContentType("text/html");
+        response.setCharacterEncoding("utf-8");
+
+        PrintWriter w = response.getWriter();
+        w.write("<html>");
+        w.write("<head>");
+        w.write(" <meta charset=\"UTF-8\">");
+        w.write(" <title>Title</title>");
+        w.write("</head>");
+        w.write("<body>");
+        w.write("<a href=\"/index.html\">메인</a>");
+        w.write("<table>");
+        w.write(" <thead>");
+        w.write(" <th>id</th>");
+        w.write(" <th>username</th>");
+        w.write(" <th>age</th>");
+        w.write(" </thead>");
+        w.write(" <tbody>");
+
+        // w.write(" <tr>");
+        // w.write(" <td>1</td>");
+        // w.write(" <td>userA</td>");
+        // w.write(" <td>10</td>");
+        // w.write(" </tr>");
+
+        for (Member member : members) {
+            w.write(" <tr>");
+            w.write(" <td>" + member.getId() + "</td>");
+            w.write(" <td>" + member.getUsername() + "</td>");
+            w.write(" <td>" + member.getAge() + "</td>");
+            w.write(" </tr>");
+        }
+        w.write(" </tbody>");
+        w.write("</table>");
+        w.write("</body>");
+        w.write("</html>");
+    }
+}
+
+```
+
+* `memberRepository.findall()`을 통해 모든 회원을 조회한다.
+* 저장된 회원 목록을 확인한다.
+    * 자바로 html를 작성하기 때문에 for문으로 List 형태로 존재하는 `members`의 모든 `member`들을 조회한다.
+
+* HTML tag
+    * `<table>`
+        * 표를 만드는 태그(웹사이트의 프레임을 잡들 때도 사용)
+        * 최근에는 권장하지 않는 방식
+        * `<td>` table data: 표 각각의 실제 데이터
+        * `<tr>` table row: td태그를 행으로 묶어준다.
+        * `<th>` table header: 테이블에서 제목이 되는 header cell을 정의(속성)
+        * `<thead>` table head: 테이블 제목
+        * `<tbody>` table body: 테이블 내용
+        * `<tfoot>` table foot: 끝에 오는 내용
+
+#### 템플릿 엔진으로
+
+지금까지 서블릿과 자바 코드만으로 HTML을 만들어 보았다. 서블릿 덕분에 동적으로 원하는 HTML을 마음껏 만들 수 있다. 정적인 HTML 문서라면 화면이 계속 달라지는 회원의 저장 결과라던가, 회원 목록같은
+동적인 HTML을 만드는 일은 불가능 할 것이다.       
+그런데, 코드에서 보듯이 이것은 매우 복잡하고 비효율 적이다. 자바 코드로 HTML을 만들어 내는 것 보다 차라리 HTML 문서에 동적으로 변경해야 하는 부분만 자바 코드를 넣을 수 있다면 더 편리할
+것이다.        
+이것이 바로 템플릿 엔진이 나온 이유이다. 템플릿 엔진을 사용하면 HTML 문서에서 필요한 곳만 코드를 적용해서 동적으로 변경할 수 있다.   
+템플릿 엔진에는 JSP, **Thymeleaf**, Freemarker, Velocity등이 있다.
+
+> 참고    
+> JSP는 성능과 기능면에서 다른 템플릿 엔진과의 경쟁에서 밀리면서, 점점 사장되어 가는 추세이다. 템플릿 엔진들은 각각 장단점이 있는데, 강의에서는 JSP는 앞부분에서 잠깐 다루고, 스프링과 잘 통합되는 Thymeleaf를 사용한다.
+
+#### index.html - 변경
+
+* 서블릿에서 JSP, MVC 패턴, 직접 만드는 MVC 프레임워크, 그리고 스프링까지 긴 여정을 함께할 페이지이다.
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<ul>
+    <li><a href="basic.html">서블릿 basic</a></li>
+    <li>서블릿
+        <ul>
+            <li><a href="/servlet/members/new-form">회원가입</a></li>
+            <li><a href="/servlet/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>JSP
+        <ul>
+            <li><a href="/jsp/members/new-form.jsp">회원가입</a></li>
+            <li><a href="/jsp/members.jsp">회원목록</a></li>
+        </ul>
+    </li>
+    <li>서블릿 MVC
+        <ul>
+            <li><a href="/servlet-mvc/members/new-form">회원가입</a></li>
+            <li><a href="/servlet-mvc/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>FrontController - v1
+        <ul>
+            <li><a href="/front-controller/v1/members/new-form">회원가입</a></li>
+            <li><a href="/front-controller/v1/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>FrontController - v2
+        <ul>
+            <li><a href="/front-controller/v2/members/new-form">회원가입</a></li>
+            <li><a href="/front-controller/v2/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>FrontController - v3
+        <ul>
+            <li><a href="/front-controller/v3/members/new-form">회원가입</a></li>
+            <li><a href="/front-controller/v3/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>FrontController - v4
+        <ul>
+            <li><a href="/front-controller/v4/members/new-form">회원가입</a></li>
+            <li><a href="/front-controller/v4/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>FrontController - v5 - v3
+        <ul>
+            <li><a href="/front-controller/v5/v3/members/new-form">회원가입</a></
+            li>
+            <li><a href="/front-controller/v5/v3/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>FrontController - v5 - v4
+        <ul>
+            <li><a href="/front-controller/v5/v4/members/new-form">회원가입</a></
+            li>
+            <li><a href="/front-controller/v5/v4/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>SpringMVC - v1
+        <ul>
+            <li><a href="/springmvc/v1/members/new-form">회원가입</a></li>
+            <li><a href="/springmvc/v1/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>SpringMVC - v2
+        <ul>
+            <li><a href="/springmvc/v2/members/new-form">회원가입</a></li>
+            <li><a href="/springmvc/v2/members">회원목록</a></li>
+        </ul>
+    </li>
+    <li>SpringMVC - v3
+        <ul>
+            <li><a href="/springmvc/v3/members/new-form">회원가입</a></li>
+            <li><a href="/springmvc/v3/members">회원목록</a></li>
+        </ul>
+    </li>
+</ul>
+</body>
+</html>
+```
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
