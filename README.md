@@ -893,6 +893,54 @@ public class ResponseHeaderServlet extends HttpServlet {
 * 주석 처리 된 부분은 `setHeader`에서 원하는 키의 value값을 지정하는 형태이며, 주석처리가 되지 않는 부분은 `set`으로 시작하는 메소드 명으로 직접 값을 지정하는 방법이다.
     * 주로 주석처리를 하지 않는 방법을 많이 사용한다. 결과적으로는 같은 결과를 보여준다.
 
+### 2-11. HTTP 응답 데이터 - 단순 텍스트, HTML
+
+* HTTP 응답 메시지는 주로 다음 내용을 담아서 전달한다.
+    * 단순 텍스트 응답
+        * `writer.println("ok");`
+    * HTML 응답
+    * HTML API - MessageBody JSON 응답
+
+#### ResponseHtmlServlet
+
+* HttpServeltResponse - HTML 응답
+
+```java
+package hello.servlet.basic.response;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+@WebServlet(name = "responseHtmlServlet", urlPatterns = "/response-html")
+public class ResponseHtmlServlet extends HttpServlet {
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // Content-Type: text/html;charset-utf-8
+        response.setContentType("text/html");
+        response.setCharacterEncoding("utf-8");
+
+        PrintWriter writer = response.getWriter();
+        writer.println("<html>");
+        writer.println("<body>");
+        writer.println("    <div>안녕?</div>");
+        writer.println("</body>");
+        writer.println("</html>");
+    }
+}
+
+```
+
+* `response`의 `content-Type, charset`은 항상 설정하자.
+    * 디폴트 값이 존재하지만 `charset`의 경우 `utf-8`이 아닌 `ISO-8859-1`이다. 이는 한글이 깨진 상태로 출력이 된다.
+
+* `response.getWriter()`메소드를 이용해서 단순 텍스트를 HTML 형식으로 작성하여 message body를 작성했다.
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
