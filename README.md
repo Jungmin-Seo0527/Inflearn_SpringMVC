@@ -2201,6 +2201,241 @@ public class FrontControllerServletV1 extends HttpServlet {
     * 인터페이스와 구현체를 분리시고, map에서 받은 구현체들은 다시 인터페이스 형식으로 받았기에 어떠한 구현체가 호출되어도 단 한줄로 모두 받아낼 수 있다.(위대한 부모...) 이러한 방식으로 코딩하는 것은
       눈여겨 볼 필요가 있으며 실무에서도 많이 쓰이는 방식이라고 한다. (**다형성!!!!**)
 
+### 4-3. View 분리 - v2
+
+모든 컨트롤러에서 뷰로 이동하는 부분에 중복이 있고, 깔끔하지 않다.
+
+```
+String viewPath = "/WEB-INF/wiews/new-form.jsp"
+RequestDispatcher dispatcher = request.getRequestDispatcher(viewPath);
+dispatcher.forward(request, response);
+```
+
+이 부분을 깔끔하게 분리하기 위해 별도로 뷰를 처리하는 객체를 만들자.
+
+#### V2 구조
+
+![](https://i.ibb.co/6tsstqd/bandicam-2021-06-07-21-38-20-244.jpg)
+
+#### MyView
+
+뷰 객체는 이후 다른 버전에서도 함께 사용하므로 패키지 위치를 `frontController`에 두었다.
+
+```java
+package hello.servlet.web.frontcontroller;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+public class MyView {
+
+    private String viewPath;
+
+    public MyView(String viewPath) {
+        this.viewPath = viewPath;
+    }
+
+    public void render(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        RequestDispatcher dispatcher = request.getRequestDispatcher(viewPath);
+        dispatcher.forward(request, response);
+    }
+}
+
+```
+
+* 생성자에서 `viewPath`를 파라미터로 받는다.
+
+```
+String viewPath = "/WEB-INF/wiews/new-form.jsp"
+```  
+
+* 이후 `render`에서 랜더링 작업을 수행한다.
+
+```
+RequestDispatcher dispatcher = request.getRequestDispatcher(viewPath);
+dispatcher.forward(request, response);
+```
+
+* 중복되는 코드를 각각 생성자와 `render`메소드로 나누어서 작성했다고 이해하면 된다.
+
+#### ControllerV2
+
+```java
+package hello.servlet.web.frontcontroller.v2;
+
+import hello.servlet.web.frontcontroller.MyView;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+public interface ControllerV2 {
+
+    MyView process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException;
+}
+
+```
+
+* 이전의 `ControllerV1`의 `process()`는 `void`를 반환한 것과는 다르게 `ControllerV2`의 `process()`는 `MyView`를 반환하고 있다.
+    * 그 이유는 `ControllerV2`의 구현체와 `FrontControllerV2`에서 확인할 수 있다.
+
+#### MemberFormControllerV2
+
+* 회원 등록 폼
+
+```java
+package hello.servlet.web.frontcontroller.v2.controller;
+
+import hello.servlet.web.frontcontroller.MyView;
+import hello.servlet.web.frontcontroller.v2.ControllerV2;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+public class MemberFormControllerV2 implements ControllerV2 {
+
+    @Override
+    public MyView process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        return new MyView("/WEB-INF/views/new-form.jsp");
+    }
+}
+
+```
+
+* 각 컨트롤러는 복잡한 `dispatcher.forward()`를 직접 생성해서 호출하지 않아도 된다.
+    * 단순히 `MyView`객체를 생성하고 거기에 뷰 이름만 넣고 반환하면 된다.
+
+* `ControllerV1`를 구현한 클래스와 `ControllerV2`를 구현한 클래스를 비교해보면, 이 부분의 중복이 확실하게 제거된 것을 확인할 수 있다.
+
+#### MemberSaveControllerV2
+
+* 회원 저장
+
+```java
+package hello.servlet.web.frontcontroller.v2.controller;
+
+import hello.servlet.domain.member.Member;
+import hello.servlet.domain.member.MemberRepository;
+import hello.servlet.web.frontcontroller.MyView;
+import hello.servlet.web.frontcontroller.v2.ControllerV2;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+public class MemberSaveControllerV2 implements ControllerV2 {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+
+    @Override
+    public MyView process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String username = request.getParameter("username");
+        int age = Integer.parseInt(request.getParameter("age"));
+
+        Member member = new Member(username, age);
+        memberRepository.save(member);
+
+        request.setAttribute("member", member);
+        return new MyView("/WEB-INF/views/save-result.jsp");
+    }
+}
+
+```
+
+#### MemberListControllerV2
+
+* 회원 목록
+
+```java
+package hello.servlet.web.frontcontroller.v2.controller;
+
+import hello.servlet.domain.member.Member;
+import hello.servlet.domain.member.MemberRepository;
+import hello.servlet.web.frontcontroller.MyView;
+import hello.servlet.web.frontcontroller.v2.ControllerV2;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+
+public class MemberListControllerV2 implements ControllerV2 {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+
+    @Override
+    public MyView process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        List<Member> members = memberRepository.findAll();
+        request.setAttribute("members", members);
+        return new MyView("/WEB-INF/views/members.jsp");
+    }
+}
+
+```
+
+#### FrontControllerV2
+
+```java
+package hello.servlet.web.frontcontroller.v2;
+
+import hello.servlet.web.frontcontroller.MyView;
+import hello.servlet.web.frontcontroller.v2.controller.MemberFormControllerV2;
+import hello.servlet.web.frontcontroller.v2.controller.MemberListControllerV2;
+import hello.servlet.web.frontcontroller.v2.controller.MemberSaveControllerV2;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+@WebServlet(name = "frontControllerServletV2", urlPatterns = "/front-controller/v2/*")
+public class FrontControllerServletV2 extends HttpServlet {
+
+    private Map<String, ControllerV2> controllerMap = new HashMap<>();
+
+    public FrontControllerServletV2() {
+        controllerMap.put("/front-controller/v2/members/new-form", new MemberFormControllerV2());
+        controllerMap.put("/front-controller/v2/members/save", new MemberSaveControllerV2());
+        controllerMap.put("/front-controller/v2/members", new MemberListControllerV2());
+    }
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String requestURI = request.getRequestURI();
+
+        ControllerV2 controller = controllerMap.get(requestURI);
+        if (controller == null) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        MyView view = controller.process(request, response);
+        view.render(request, response);
+    }
+}
+```
+
+* ControllerV2의 반환 타입이 `Myview`이므로 프론트 컨트롤러는 컨트롤러의 호출 결과로 `MyView`를 반환 받는다. 그리고 `view.render()`를 호출하면 `forward()`로직을
+  수행해서 JSP가 실행된다.
+
+* 프론트 컨트롤러의 도입으로 `MyView`객체의 `render()`를 호출하는 부분을 모두 일관되게 처리할 수 있다. 각각의 컨트롤러는 `MyView`객체를 생성만 해서 반환하면 된다.
+
+* 현 단계에서는 중복되는 코드를 메소드로 abstract하여 간결화 하였다.
+    * 간결화 한 방법이 객체를 반환해서 객체의 메소드를 실행 하도록 한 방법은 참고할 만 하다.
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
