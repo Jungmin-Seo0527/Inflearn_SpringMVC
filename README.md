@@ -1967,6 +1967,27 @@ HttpServletRequest request, HttpServletResponse response
 해결할 수 있다. (입구를 하나로!!!)     
 스프링 MVC의 핵심도 바로 이 프론트 컨트롤러에 있다.
 
+## 4. MVC 프레임워크 만들기
+
+### 4-1. 프론트 컨트롤러 패턴 소개
+
+* 프론트 컨트롤러 도입 전
+  ![](https://i.ibb.co/MDZJhR6/bandicam-2021-06-07-18-05-28-379.jpg)
+
+* 프론트 컨트롤러 도입 후
+  ![](https://i.ibb.co/61qfV5v/bandicam-2021-06-07-18-05-37-093.jpg)
+
+* FrontController 패턴 특징
+    * 프론트 컨트롤러 서블릿 하나로 클라이언트의 요청을 받음
+    * 프론트 컨트롤러가 요청에 맞는 컨트롤러를 찾아서 호출
+    * 입구를 하나로!!!
+    * 공통 처리 가능
+    * 프론트 컨트롤러를 제외한 나머지 컨트롤러는 서블릿을 사용하지 않아도 됨
+
+* 스프링 웹 MVC와 프론트 컨트롤러
+    * 스프링 웹 MVC의 핵심이 바로 **FrontController**
+    * 스프링 웹 MVC의 **DispatcherServlet**이 FrontController 패턴으로 구현되어 있음
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
