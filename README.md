@@ -3255,6 +3255,110 @@ public class FrontControllerServletV5 extends HttpServlet {
 >
 > 변환(어댑터) -> 처리(핸들러 = 컨트롤러)
 
+### 4-7. 유연한 컨트롤러2 - v5
+
+#### FrontControllerServletV5 - ControllerV4 기능 추가
+
+* 코드 추가
+* `src/main/java/hello/servlet/web/frontcontroller/v5/FrontControllerServletV5.java`
+
+```java
+package hello.servlet.web.frontcontroller.v5;
+
+@WebServlet(name = "frontControllerServletV5", urlPatterns = "/front-controller/v5/*")
+public class FrontControllerServletV5 extends HttpServlet {
+
+    private final Map<String, Object> handlerMappingMap = new HashMap<>();
+    private final List<MyHandlerAdapter> handlerAdapters = new ArrayList<>();
+
+    public FrontControllerServletV5() {
+        initHandlerMappingMap();
+        initHandlerAdapters();
+    }
+
+    private void initHandlerMappingMap() {
+        handlerMappingMap.put("/front-controller/v5/v3/members/new-form", new MemberFormControllerV3());
+        handlerMappingMap.put("/front-controller/v5/v3/members/save", new MemberSaveControllerV3());
+        handlerMappingMap.put("/front-controller/v5/v3/members", new MemberListControllerV3());
+
+        // ----------------------- 추가 시작 ----------------------------
+        handlerMappingMap.put("/front-controller/v5/v4/members/new-form", new MemberFormControllerV4());
+        handlerMappingMap.put("/front-controller/v5/v4/members/save", new MemberSaveControllerV4());
+        handlerMappingMap.put("/front-controller/v5/v4/members", new MemberListControllerV4());
+        // ----------------------- 추가 끝 ----------------------------
+    }
+
+    private void initHandlerAdapters() {
+        handlerAdapters.add(new ControllerV3HandlerAdapter());
+        handlerAdapters.add(new ControllerV4HandlerAdapter()); // 추가---
+    }
+}
+```
+
+* 핸들러 매핑(`handlerMappingMap`)에 `ControllerV4`를 사용하는 컨트롤러를 추가
+* 해당 컨트롤러를 처리할 수 있는 어댑터인 `ControllerV4HandlerAdapter` 추가
+    * 아직 `ControllerV4HandlerAdapter`를 구현하지 않았으므로 에러 발생
+
+#### ControllerV4HandlerAdapter
+
+* `src/main/java/hello/servlet/web/frontcontroller/v5/adapter/ControllerV4HandlerAdapter.java`
+
+```java
+package hello.servlet.web.frontcontroller.v5.adapter;
+
+import hello.servlet.web.frontcontroller.ModelView;
+import hello.servlet.web.frontcontroller.v4.ControllerV4;
+import hello.servlet.web.frontcontroller.v5.MyHandlerAdapter;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+public class ControllerV4HandlerAdapter implements MyHandlerAdapter {
+
+    @Override
+    public boolean supports(Object handler) {
+        return handler instanceof ControllerV4;
+    }
+
+    @Override
+    public ModelView handle(HttpServletRequest request, HttpServletResponse response, Object handler) throws ServletException, IOException {
+        ControllerV4 controller = (ControllerV4) handler;
+
+        Map<String, String> paramMap = createParamMap(request);
+        Map<String, Object> model = new HashMap<>();
+
+        String viewName = controller.process(paramMap, model);
+
+        ModelView mv = new ModelView(viewName);
+        mv.setModel(model);
+
+        return mv;
+    }
+
+    private Map<String, String> createParamMap(HttpServletRequest request) {
+        Map<String, String> paramMap = new HashMap<>();
+        request.getParameterNames().asIterator()
+                .forEachRemaining(paramName -> paramMap.put(paramName, request.getParameter(paramName)));
+        return paramMap;
+    }
+}
+
+```
+
+* `ControllerV4`에서는 `process()`메소드가 파라미터로 `paramMap`과 `model`를 받아서 `viewName`을 `String`형으로 반환했다.
+    * 기존에 `ModelView`의 필드를 이루는 `viewName`과 `model`를 가지고 새로운 `ModelView`객체를 생성해서 반환했다.
+
+* 변환하는 과정은 `ControllerV3HandlerAdapter`와 동일하다.
+
+> MTH       
+> `handle()`메소드는 `ModelView`를 반환한다. `ControllerV3HandlerAdapter`를 구현할때는 `ControllerV3`의 `process`가 `ModelView`를 반환했기 때문에 반환값을 그대로 `handle()`의 반환값으로 썼다.     
+> 하지만 `ControllerV4`에서는 `process()`외부에서 `model`를 만들고 파라미터로 전달한 후에 반환값은 `viewName`을 가졌다. 처음에는 당황할 수 있으나, 결국에는 `handle`의 반환값인 `ModelView`를 이루는 요소인 `viewName`과 `model`모두 가지고 있기에 새로 객체를 생성해서 반환하면 된다.     
+> `mv.setModel(model)`
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
