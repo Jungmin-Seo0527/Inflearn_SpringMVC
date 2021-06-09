@@ -2436,6 +2436,356 @@ public class FrontControllerServletV2 extends HttpServlet {
 * 현 단계에서는 중복되는 코드를 메소드로 abstract하여 간결화 하였다.
     * 간결화 한 방법이 객체를 반환해서 객체의 메소드를 실행 하도록 한 방법은 참고할 만 하다.
 
+### 4-4. Model 추가 - v3
+
+#### 서블릿 종속성 제거
+
+* 컨트롤러 입장에서 `HttpServletRequest`, `HttpServletResponse`이 꼭 필요할까?
+* 요청 파라미터 정보는 자바의 `Map`으로 대신 넘기도록 하면 지금 구조에서는 컨트롤러가 서블릿 기술을 몰라도 동작할 수 있다.
+* `request`객체를 `Model`로 사용하는 대신에 별도의 `Model`객체를 만들어서 반환하면 된다.
+* 우리가 구현하는 컨트롤러가 서블릿 기술을 전혀 사용하지 않도록 변경해보자.
+    * 구현 코드도 매우 단순해지고, 테스트 코드 작성이 쉽다.
+
+#### 뷰 이름 중복 제거
+
+* 컨트롤러에서 지정하는 뷰 이름에 중복이 있는 것을 확인 할 수 있다.
+* 컨트롤러는 **뷰의 논리 이름**을 반환하고, 실제 물리 위치의 이름은 프론트 컨트롤러에서 처리하도록 단순화 하자.
+* 이렇게 해두면 향후 뷰의 폴더 위치가 함께 이동해도 프론트 컨트롤러만 고치면 된다.
+    * `/WEB-INF/views/new-form.jsp` -> **new-form**
+    * `/WEB-INF/views/save-result.jst` -> **sve-result**
+    * `/WEB-INF/views/members.jsp` -> **members**
+
+#### V3 구조
+
+![](https://i.ibb.co/6tsstqd/bandicam-2021-06-07-21-38-20-244.jpghttps://i.ibb.co/02b0P0j/bandicam-2021-06-09-16-17-36-460.jpg)
+
+#### ModelView
+
+지금까지 컨트롤러에서 서블릿에 종속적인 `HttpServletRequest`를 사용했다. 그리고 `Model`도 `request.setAttribute()`를 통해 데이터를 저장하고 뷰에 전달했다.  
+서블릿의 종속성을 제거하기 위해 Model을 직접 만들고, 추가로 View 이름까지 전달하는 객체를 만들어 보자.     
+(이번 버전에서는 컨트롤러에서 `HttpServletRequest`를 사용할 수 없다. 따라서 직접 `request.setAttribute()`를 호출할 수 도 없다. 따라서 Model이 별도로 필요하다.)
+
+참고로 `ModelView`객체는 다른 버전에서도 사용하므로 패키지를 `frontcontroller`에 둔다.
+
+* `src/main/java/hello/servlet/web/frontcontroller/ModelView.java`
+
+```java
+package hello.servlet.web.frontcontroller;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class ModelView {
+
+    private String viewName;
+    private Map<String, Object> model = new HashMap<>();
+
+    public ModelView(String viewName) {
+        this.viewName = viewName;
+    }
+
+    public String getViewName() {
+        return viewName;
+    }
+
+    public void setViewName(String viewName) {
+        this.viewName = viewName;
+    }
+
+    public Map<String, Object> getModel() {
+        return model;
+    }
+
+    public void setModel(Map<String, Object> model) {
+        this.model = model;
+    }
+}
+
+```
+
+뷰의 이름과 뷰를 랜더링할 때 필요한 model 객체를 가지고 있다. model은 단순히 map으로 되어 있으므로 컨트롤러에서 뷰에 필요한 데이터를 key, value로 넣어주면 된다.
+
+* `Map<String, Object> model = new HashMap<>()`
+    * 만약 save를 예로 들어 보자.
+    * `request`에서 `getParameter()`를 이용해서 `username`, `age`를 뽑아서 `Member`객체를 만든 후에 그 객체를 `MemberRepository`에
+      저장하고, `Member`객체를 `save-result.jsp`로 넘겨서 출력을 하기 위해서 model에 넘겨주는 행위로 `request.setAttribute("member", member)`를 했다.
+    * `setAttribute()`메소드의 파라미터가 객체의 이름과 실제 객체를 파라미터로 받는것에서 Map을 이용하면 Model을 구현할 수 있다는 것을 알 수 있다.
+
+#### ControllerV3
+
+* Controller 인터페이스
+* `src/main/java/hello/servlet/web/frontcontroller/v3/ControllerV3.java`
+
+```java
+package hello.servlet.web.frontcontroller.v3;
+
+import hello.servlet.web.frontcontroller.ModelView;
+
+import java.util.Map;
+
+public interface ControllerV3 {
+
+    ModelView process(Map<String, String> paramMap);
+}
+
+```
+
+* 이 컨트롤러는 서블릿 기술을 전혀 사용하지 않는다.
+    * 따라서 구현이 매우 단순해지고, 테스트 코드 작성시 테스트 하기 쉽다.
+
+* `HttpServletRequest`가 제공하는 파라미터는 프론트 컨트롤러가 `paramMap`에 담아서 호출해주면 된다.
+* 응답 결과로 뷰 이름과 뷰에 전달할 Model 데이터를 포함하는 `ModelView`객체를 반환하면 된다.
+    * 이후 `FrontController`에서 반환받는 `ModelView`에서 뷰의 이름과 모델을 바탕으로 JSP 문서롤 호출함과 동시에 JSP에서는 필요한 데이터를 model에서 꺼내서 쓸수 있다.
+
+#### MemberFromControllerV3
+
+* 회원 등록 폼
+* `src/main/java/hello/servlet/web/frontcontroller/v3/controller/MemberFormControllerV3.java`
+
+```java
+package hello.servlet.web.frontcontroller.v3.controller;
+
+import hello.servlet.web.frontcontroller.ModelView;
+import hello.servlet.web.frontcontroller.v3.ControllerV3;
+
+import java.util.Map;
+
+public class MemberFormControllerV3 implements ControllerV3 {
+
+    @Override
+    public ModelView process(Map<String, String> paramMap) {
+        return new ModelView("new-form");
+    }
+}
+
+```
+
+* `ModelView`를 생성할 때 `new-form`이라는 view의 **논리적인 이름**을 지정한다.
+    * 실제 물리적인 이름은 프론트 컨트롤러에서 처리한다.
+    * 물리적인 이름: `/WEB-INF/views/new-form.jsp`
+    * 모든 jsp를 같은 패키지인 `/WEB-INF/views`에 저장하니 이 부분을 중복으로 작성하는 것을 피하고자 하는 방법이다.
+    * 논리적인 이름이 jsp의 파일 이름이라고 생각하면 쉽다.
+
+#### MemberSaveControllerV3
+
+* 회원 저장
+* `src/main/java/hello/servlet/web/frontcontroller/v3/controller/MemberSaveControllerV3.java`
+
+```java
+package hello.servlet.web.frontcontroller.v3.controller;
+
+import hello.servlet.domain.member.Member;
+import hello.servlet.domain.member.MemberRepository;
+import hello.servlet.web.frontcontroller.ModelView;
+import hello.servlet.web.frontcontroller.v3.ControllerV3;
+
+import java.util.Map;
+
+public class MemberSaveControllerV3 implements ControllerV3 {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+
+    @Override
+    public ModelView process(Map<String, String> paramMap) {
+        String username = paramMap.get("username");
+        int age = Integer.parseInt(paramMap.get("age"));
+
+        Member member = new Member(username, age);
+        memberRepository.save(member);
+
+        ModelView mv = new ModelView("save-result");
+        mv.getModel().put("member", member);
+        return mv;
+    }
+}
+
+```
+
+* `paramMap.get("username")`
+    * 파라미터 정보는 `map`에 담겨있다. map에서 필요한 요청 파라미터를 조회하면 된다.
+    * `v2`에서는 `request`에서 직접 `getParameter()`를 사용해서 파라미터 정보를 뽑아내었다. 이 부분에서 서블릿에 종속적이므로 이를 없애고자 `HttpServletRequest`객체
+      대신에 객체의 정보를 `paramMap`에 전달 한 후에 이를 파라미터도 전달 받았다.
+    * 역할로 보자면 `paramMap` = `HttpServletRequest`라고 생각해도 무방하다.
+
+* `mv.getModel().put("member", member)`
+    * 모델은 단순한 map이므로 모델에 뷰에서 필요한 `member`객체를 담고 반환한다.
+    * `request.setAttribute("member", member)`와 동일한 과정이다.
+    * 이전에 `request`를 Model로 사용했다면 이번에는 Model를 따로 구현했기 때문에 그 Model(`mv.getModel()`)에 JSP가 필요로 하는 데이터를 넘겨주는 것이다.
+
+#### MemberListControllerV3
+
+* 회원 목록
+* `src/main/java/hello/servlet/web/frontcontroller/v3/controller/MemberListControllerV3.java`
+
+```java
+package hello.servlet.web.frontcontroller.v3.controller;
+
+import hello.servlet.domain.member.Member;
+import hello.servlet.domain.member.MemberRepository;
+import hello.servlet.web.frontcontroller.ModelView;
+import hello.servlet.web.frontcontroller.v3.ControllerV3;
+
+import java.util.List;
+import java.util.Map;
+
+public class MemberListControllerV3 implements ControllerV3 {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+
+    @Override
+    public ModelView process(Map<String, String> paramMap) {
+        List<Member> members = memberRepository.findAll();
+        ModelView mv = new ModelView("members");
+        mv.getModel().put("members", members);
+        return mv;
+    }
+}
+
+```
+
+#### FrontControllerServletV3
+
+* `src/main/java/hello/servlet/web/frontcontroller/v3/FrontControllerServiceV3.java`
+
+```java
+package hello.servlet.web.frontcontroller.v3;
+
+import hello.servlet.web.frontcontroller.ModelView;
+import hello.servlet.web.frontcontroller.MyView;
+import hello.servlet.web.frontcontroller.v3.controller.MemberFormControllerV3;
+import hello.servlet.web.frontcontroller.v3.controller.MemberListControllerV3;
+import hello.servlet.web.frontcontroller.v3.controller.MemberSaveControllerV3;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+@WebServlet(name = "frontControllerServiceV3", urlPatterns = "/front-controller/v3/*")
+public class FrontControllerServiceV3 extends HttpServlet {
+
+    private Map<String, ControllerV3> controllerMap = new HashMap<>();
+
+    public FrontControllerServiceV3() {
+        controllerMap.put("/front-controller/v3/members/new-form", new MemberFormControllerV3());
+        controllerMap.put("/front-controller/v3/members/save", new MemberSaveControllerV3());
+        controllerMap.put("/front-controller/v3/members", new MemberListControllerV3());
+    }
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String requestURI = request.getRequestURI();
+
+        ControllerV3 controller = controllerMap.get(requestURI);
+        if (controller == null) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        Map<String, String> paramMap = createParamMap(request);
+        ModelView mv = controller.process(paramMap);
+
+        String viewName = mv.getViewName();
+        MyView view = viewResolver(viewName);
+
+        view.render(mv.getModel(), request, response);
+    }
+
+    private MyView viewResolver(String viewName) {
+        return new MyView("/WEB-INF/views/" + viewName + ".jsp");
+    }
+
+    private Map<String, String> createParamMap(HttpServletRequest request) {
+        Map<String, String> paramMap = new HashMap<>();
+
+        request.getParameterNames().asIterator()
+                .forEachRemaining(paramName -> paramMap.put(paramName, request.getParameter(paramName)));
+        return paramMap;
+    }
+}
+
+```
+
+* `view.render(mv.getModel(), request, response)`코드에 컴파일 오류가 발생할 것이다. (`MyView`클래스에서 메소드 추가가 필요하다.)
+
+* `Map<String, String> paramMap = createParamMap(request)`
+    * `HttpServletRequest`역할을 대신하는 `paramMap`을 생성한다.
+    * `createParamMap()`
+        * `HttpServletRequest`를 파라미터로 받아서 그 정보들을 모두 Map형태로 저장한 후에 그 Map을 반환한다. 즉 `HttpServletRequest` -> `Map`
+
+* `ModelView mv = controller.process(paramMap)`
+    * `paramMap`을 전달하여 각 컨트롤러를 실행시킨다.
+    * 각 컨트롤러의 실행 결과는 `ModelView`객체로 반환되며 이 객체는 View를 위한 데이터가 저장되어 있다.
+    * 복습겸 언급하자면 `ModelView`객체에는 `view`의 논리적 이름(jsp 파일 이름)과 jsp 파일이 필요로 하는 데이터가 저장되어 있는 model로 구성되어 있다.
+
+* `viewResolver(viewName)`
+    * 논리적인 이름으로 저장되어 있는 `viewName`을 물리적 경로를 추가한 물리적 이름, 즉 경로를 포함하고 있는 형태로 변환하는 것이다.
+        * 논리 뷰 이름: `member`
+        * 물리 뷰 경로: `/WEB-INF/views/members.jsp`
+    * 모든 jsp파일은 `/WEB-INF/views`에 저장되어 있고, 모든 파일이 jsp이므로 확장자는 `.jsp`이다.
+    * `MyView`객체에 파라미터로 물리적인 뷰 이름을 전달하여 생성한다.
+
+#### MyView
+
+* `render(Map<String, Object> model, HttpServletRequest request, HttpServletResponse response)` 메소드 추가
+* `src/main/java/hello/servlet/web/frontcontroller/MyView.java`
+
+```java
+package hello.servlet.web.frontcontroller;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.Servlet;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Map;
+
+public class MyView {
+
+    private String viewPath;
+
+    public MyView(String viewPath) {
+        this.viewPath = viewPath;
+    }
+
+    public void render(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        RequestDispatcher dispatcher = request.getRequestDispatcher(viewPath);
+        dispatcher.forward(request, response);
+    }
+
+    // --------------------- 추가 시작 -------------------------------
+    public void render(Map<String, Object> model, HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        modelToRequestAttribute(model, request);
+        RequestDispatcher dispatcher = request.getRequestDispatcher(viewPath);
+        dispatcher.forward(request, response);
+    }
+
+    private void modelToRequestAttribute(Map<String, Object> model, HttpServletRequest request) {
+        model.forEach(request::setAttribute);
+    }
+
+    // --------------------- 추가 끝---------------------------------
+}
+
+```
+
+* 뷰 객체를 통해서 HTML 화면을 렌더링 한다.
+* 뷰 객체의 `render()`는 모델 정보도 함께 받는다.
+* JSP는 `request.getAttribute()`로 데이터를 조회하기 때문에, 모델의 데이터를 꺼내서 `request.setAttrubute()`로 담아둔다.
+* JSP로 forward 해서 JSP를 렌더링 한다.
+
+> `MyView`에서 알수 있듯이, `ModelView`를 만들어서 `HttpServletRequest`객체가 Model의 역할을 수행했던 부분을 대신했지만, 모든 역할을 수행하진 못한다.
+>   * HTML 화면을 랜더링 하는 과정에서는 결국 필요한 데이터를 `HttpServletRequest`객체에서 뽑아서 사용한다.
+>   * 지금 버전은 Controller의 입장에서 서블릿에 종속하지 않도록 구현하기 위한 Model를 만든 것이다.
+>   * 가짜 모델(`ModelView`)은 다시 모든 정보를 `request.setAttrubute()`를 통해 `request`에 넘겨주어야 한다.
+> 
+> 처음에는 `ModelView`의 `model`이 Model의 모든 역할을 수행할 수 있다고 이해해서 코드 이해가 되지 않았다. 주의하자. 마지막엔 다시 모든 정보를 `request.setAttrubue()`로 전달한다. 
+
 # Note
 
 * IntelliJ 무료버전일때 `War`의 경우 톰캣이 정상 시작되지 않는 경우가 생김
